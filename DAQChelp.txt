@@ -1,0 +1,80 @@
+DAQCplate Help Revision 1.03
+
+Digital Input Functions:
+    getDINbit(addr,bit) - return single bit value
+    getDINall(addr) - return all eight bits
+    enableDINint(addr, bit, edge) - enable interrupts for an input change on
+        the specified bit. The "edge" value can be 'r' for rising, 'f' for
+        falling, or 'b' for both.
+    disableDINint(addr,bit) - disable interrupts on the specified bit
+    getTEMP(addr,bit,scale) - a special function to read a DS18X20 temp sensor
+        attached to the specified bit input. Scale values can be 'c', 'f', or 'k' 
+        for Celsius, Fahrenheit, or Kelvin. Note that this function takes about
+        1 second to complete.
+
+Digital Output Functions:
+    setDOUTbit(addr, bit) - set single bit
+    clrDOUTbit(addr, bit) - clear single bit
+    toggleDOUTbit(addr, bit) - toggle a single bit
+    setDOUTall(addr,byte) - set all the bits a once. Value must be 127 or less.
+
+Analog to Digital Functions:
+    getADC(addr, channel) - return voltage from single channel
+    getADCall(addr) - return voltage from all channels
+
+Digital to Analog Converter & Pulse Width Modulator Functions:
+    setPWM(addr,channel,value) - set PWM duty cycle from 0 to 1023 (0 to 100%)
+    getPWM(addr,channel) - return current PWM setting.
+    setDAC(addr,channel,value) - set DAC output voltage to 0 to 4.097 volts.
+    getDAC(addr,channel) - return current DAC output voltage.
+    calDAC(addr) - calibrate the DAC outputs. Use this function if you are
+        unsure about the quality of your power supply.
+
+Bicolor LED Control Functions:
+    setLED(addr,color) - turn on one of the LEDs in the bicolor LED package
+    clrLED(addr,color) - turn off one of the LEDs in the bicolor LED package
+
+Hybrid Functions:
+    getRANGE(addr,channel,units) - reads distance from an HC-SR04 ultrasonic 
+        sensor. The channel argument calls out the value of the digital input /
+        digital output pair required to interface to the sensor. The units can
+        'i' for inches or 'c' for centimetres.
+    
+System Level Functions:
+    getID(addr) - return Pi-Plate descriptor string
+    getFWrev(addr) - return FW revision in byte format
+    getHWrev(addr) - return HW revision in byte format
+    getADDR(addr) - return address of pi-plate. Used for polling available
+        boards at power up.
+    intEnable(addr) - enable interrupts from the DAQC. GPIO22 will be pulled
+        low if an enabled event occurs.
+    intDisable(addr) - disables and clears all interrupts on the DAQC.
+    getINTflags(addr) - returns 16 bit flag value then clears all INT flags
+    Poll() - determine what Pi-Plates are on stack as well as their addresses
+    
+Switch Functions:
+    getSWstate(addr) - returns current state of on board switch. A value of 1 is
+        returned when the switch is up and a value of 0 is returned when it's
+        down.
+    enableSWpower(addr) - pushing button on ppGPIO will short RPI GPIO23 to
+        GND and then remove 5VDC 45 seconds later. Note that this setting is
+        saved in nonvolatile memory and only has to be performed once
+    disableSWpower(addr) - disables the above. Note that this setting is stored
+        in nonvolatile memory and only has to be performed once.
+    enableSWint(addr) - allows the switch to generate an interrupts when
+        pressed. Global interrupts must be enabled before using this function.
+    disableSWint(addr) - blocks switch on board from generating an interrupt.
+
+Definitions:
+    Address (addr): DAQCplates have jumpers on the board that allow
+        their address to be set to a value between 0 and 7.
+    ADC (analog to digital converter) channels can be 0 through 8 for a 
+        total of 9 channels. Reading channel 8 will return the power supply
+        voltage.
+    DIN (digital input) bit values can be 0 through 7 for a total of 8 bits
+    DOUT (digital output) bit values can be 0 through 6 for a total of 7 bits
+    PWM (pulse width modulator) channels can be 0 or 1 for a total of 2
+        channels. The output values can be between 0 and 1023.
+    DAC (digital to analog converter) channels can be 0 or 1 for a total of
+        2 channels. The output value can be between 0 and 4.096 volts
+    LED (led) values can be 0 for the red LED or 1 for the green.

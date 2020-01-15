@@ -1,0 +1,112 @@
+DAQC2plate Help Revision 1.00
+
+Legacy DAQC Functions:
+    Digital Input Functions:
+        getDINbit(addr,bit) - return single bit value
+        getDINall(addr) - return all eight bits
+        enableDINint(addr, bit, edge) - enable interrupts for an input change on
+            the specified bit. The "edge" value can be 'r' for rising, 'f' for
+            falling, or 'b' for both.
+        disableDINint(addr,bit) - disable interrupts on the specified bit
+
+    Digital Output Functions:
+        setDOUTbit(addr, bit) - set single bit
+        clrDOUTbit(addr, bit) - clear single bit
+        toggleDOUTbit(addr, bit) - toggle a single bit
+        setDOUTall(addr,byte) - set all the bits a once. Value must be 255 or
+            less.
+
+    Analog to Digital Functions:
+        getADC(addr, channel) - return voltage from single channel
+        getADCall(addr) - return voltage from all channels
+
+    Digital to Analog Converter & Pulse Width Modulator Functions:
+        setPWM(addr,channel,value) - set PWM duty cycle from 0 to 1023 (0 to
+            100%)
+        getPWM(addr,channel) - return current PWM setting.
+        setDAC(addr,channel,value) - set DAC output voltage from 0 to 4.095
+            volts.
+        getDAC(addr,channel) - return current DAC output voltage.
+
+    Frequency Counter
+        getFREQ(addr) - returns integer value of the detected frequency on pin 8
+            of the extended functions block. Value can range from 1 to
+            about 150,000
+      
+    RGB LED Control Functions:
+        setLED(addr,color) - set the LED to one of 8 colors: 
+        getLED(addr,color) - return a string with the current LED color
+        
+    System Level Functions:
+        getID(addr) - return Pi-Plate descriptor string
+        getFWrev(addr) - return FW revision in byte format
+        getHWrev(addr) - return HW revision in byte format
+        getADDR(addr) - return address of pi-plate. Used for polling available
+            boards at power up.
+        intEnable(addr) - enable interrupts from the DAQC. GPIO22 will be pulled
+            low if an enabled event occurs.
+        intDisable(addr) - disables and clears all interrupts on the DAQC.
+        getINTflags(addr) - returns 16 bit flag value then clears all INT flags       
+
+    Definitions:
+        Address (addr): DAQCplates have jumpers on the board that allow
+            their address to be set to a value between 0 and 7.
+        ADC (analog to digital converter) channels can be 0 through 8 for a 
+            total of 9 channels. Reading channel 8 will return the power supply
+            voltage.
+        DIN (digital input) bit values can be 0 through 7 for a total of 8 bits
+        DOUT (digital output) bit values can be 0 through 7 for a total of 8
+            bits
+        PWM (pulse width modulator) channels can be 0 or 1 for a total of 2
+            channels. The output values can be between 0 and 1023.
+        DAC (digital to analog converter) channels can be 0 through 3 for a 
+            total of 4 channels. The output value can be between 0 and 4.096
+            volts
+        LED (color) valid values are the following strings: 
+            'off','red','green','yellow','blue','magenta','cyan','white'
+            
+Motor Control Mode
+    motorENABLE(addr) - places DAQC2 into motor controller mode
+    motorDISABLE(addr) - takes DAQC2 out of motor controller mode and returns it
+        to legacy DAQC mode.
+    motorMOVE(addr,motor,steps) - moves selected motor a fixed number of steps 
+        at a step rate and step size set by motorRATE
+    motorJOG(addr,motor) - continually spins motor at a step rate and and step
+        size set by motorRATE and a direction set by motorDIR.
+    motorSTOP(addr,motor) - stops selected motor by keeps coils energized
+    motorDIR(addr,motor,dir) - sets motor direction for JOG operation
+    motorRATE(addr,motor,rate,stepsize) - sets the step rate and step size of
+        selected motor
+    motorOFF(addr,motor) - stops and removes power from seleced motor. Also 
+        disables an already STOPped motor
+    motorINTenable(addr,motor) - enables controller to generate an interrupt
+        when selected motor completes a MOVE
+    motorINTdisable(addr,motor) - disables interrupts for selected motor
+    
+    Definitions
+        MOTOR (motor) one of two motors can be selected using this variable.
+            valid values are 1 and 2.
+        RATE (rate) the speed at which the motor rotates in steps per second.
+            This parameter can range from 1 to 500 steps per second.
+        STEPS (steps) the number of incremental rotations that are applied to a
+            motor during a MOVE operation. Range of values is -16383 to 16383
+        SIZE (stepsize) steps can be either 'whole' or 'half'. For eample, a
+            typical motor has a "whole" step size of 1.8 degrees. If the "half"
+            parameter is called out in the motorRATE function, each step will
+            result in 0.9 degrees of rotation
+            
+Function Generator Mode
+    fgON(addr,chan) - enable one of function generator channels. Try to limit
+        this to no more than two channels.
+    fgOFF(addr,chan) - disable an enabled function generator
+    fgFREQ(addr,chan,freq) - set the output frequency of the specified channel.
+        Must be in the range of 10Hz to 20Khz.
+    fgTYPE(addr,chan,type) - set the waveform type of the specified channel.
+        Must be an integer number between 1 and 7.
+    fgLEVEL(addr,chan,level) - set the output level of the selected channel. 
+        Must be an integer value between 1 and 4.
+        
+    Definitions
+        Channel (chan) selects which function generator the command will act
+            upon. Must be a value between 1 and 4.
+            

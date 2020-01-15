@@ -1,0 +1,37 @@
+RELAYplate Help Revision 1.0
+
+Definitions:
+    addr: Address - RELAYplates have jumpers on the board that allow
+        their address to be set to a value between 0 and 7.
+    relay: Each RELAYplate has seven individually addressable relays numbered
+        1 through 7.
+    value: some commands require or return a seven bit value that can range from
+        0 to 127
+
+RELAY Control Functions
+    relayON(addr,relay) - turns on (closes) the specified relay
+    relayOFF(addr,relay) - turns off (opens) the specified relay
+    relayTOGGLE(addr,relay) - "toggles" state of specified relay. If relay is
+        on, this command will turn it off. If relay is off, this command will
+        turn it on. Use this command to blink a lamp off and on.
+    relayALL(addr,value) - used to control the state of all relays with a single
+        command. "value" is a 7 bit number with each bit correspong to a relay.
+        Bit 0 is relay 1, bit 1 is relay 2, and so on. To turn all the relays on
+        at once use the number 127 for the value.
+    relaySTATE(addr) - Returns a 7-bit number with the current state of each
+        relay. Bit 0 is relay 1, bit 1 is relay 2, and so on. A "1" in a bit 
+        position means that the relay is on and zero means that i's off.
+    
+LED Control Functions
+    setLED(addr) - turn on the LED
+    clrLED(addr) - turn off the LED
+    toggleLED(addr) - if LED is on, turn off. If LED is off, turn on.
+
+System Level Functions:
+    getID(addr) - return Pi-Plate descriptor string
+    getFWrev(addr) - return FW revision in byte format
+    getHWrev(addr) - return HW revision in byte format
+    getPMrev() - returns revision of python module
+    getADDR(addr) - return address of pi-plate. Used for polling available
+        boards at power up.
+    RESET(addr) - set RELAYplate to power on state. Turns all relays off.
