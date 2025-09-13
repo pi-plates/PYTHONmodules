@@ -1,0 +1,244 @@
+ADCplate Help Revision 1.0
+
+Definitions:
+    addr: Address - the ADCplate has a set of jumpers on the board that allow
+        its address to be set to a value between 0 and 7.
+    channel: Each ADCplate has the following input channels
+        'S0' - 'S7' : Single ended channels 0 through 7
+        'D0' - 'D3' : Differential channels 0 through 3. D0 is the difference
+           between S0 and S1, D1 is the difference between S2 and S3, and so on.
+        'I0' - 'I3' : 4-20mA current loop inputs 0 through 3. Returned values
+           are in units of milliamps.
+        DIN0 - DIN3 : Digital inputs 0 through 3
+
+Easy Mode Functions
+    setMODE(addr,mode) - when used with Easy Mode, this function sets the sample
+      rate and resolution of the ADCplate. Valid values for mode are:
+      --------------------------------------------------------------------------
+      |      mode     | Refresh Rate | Voltage Resolution | Current Resolution |
+      |---------------|--------------|--------------------|--------------------|
+      |'slow' / 'high'|    1.25Hz    |      21.6 bits     |      23.6 bits     |
+      |     'med'     |    26.32Hz   |      19.9 bits     |      19.4 bits     |
+      |'fast' / 'low' |     125Hz    |      17.5 bits     |      17.0 bits     |
+      |     'adv'     | programmable |     programmable   |     programmable   |
+      --------------------------------------------------------------------------
+      Note that slower refresh rates result in higher resolution. Because of
+      this, 'high' and 'low' can be substitured for 'slow' and 'fast'
+      respectively. Setting the mode to 'adv' or 'ADVanced' placed the
+      ADCplate in advanced mode. Continue reading for a description of
+      Advanced mode functions.  
+
+    getADC(addr, channel) - returns the value of the specified analog input
+    getADCall(addr) - returns a list with all 12 analog input combinations
+    getSall(addr) - returns a list of all 8 single ended volatge inputs
+    getDall(addr) - returns a list of all 4 differential volatge inputs
+    getIall(addr) - returns a list of all 4 current inputs in mA
+
+Advanced Mode Functions
+    In Advanced Mode mode, data from the ADCplate can be obtained in a variety
+    of different ways. Only a maximum of 8 channels can be read at a time in
+    this mode but with the advantage that each channel can have a specific
+    resolution or conversion rate.
+    
+    configINPUT(addr,channel,sampleRate,enable - optional) - sets the sample
+        rate (0-18) of the specified analog channel. If included, the optional
+        enable argument (True or False) will assign the enable status of the
+        channel. If excluded, the status will be unchanged - the default is
+        False. Note that each of the 12 possible analog channels can be
+        configured but only a maximum of eight can be enabled at a time.
+    
+        The channel argument can be 'S0' thru 'S7', 'D0' thru 'D3', and 'I0'
+        thru 'I3'. Numeric values 0 through 15 can be used for channel selection
+        as well.
+
+        Below is a table showing the characteristics of each sample rate:
+        ==================================================================
+        SR Fdata  Ts(msec) Fmux(Hz) fc (Hz)  50Hz Rej 60Hz Rej Venb Ienb 
+        0  1.25    2400     1.25     0.3     -125.63 -130.43   22.7  24  
+        1  2.5     1200     2.5      0.6     -108.66 -113.49   22.7  24  
+        2  5       600      5        1.3     -103.09 -107.92   22.4  24  
+        3  10      300      10       2.6     -101.71 -106.52   22.4  24  
+        4  16.667  60       16.67    ~10     -90     -90       21.9  24  
+        5  20      50       20.00    ~10     -85     -85       21.8  24  
+        6  25      40       25.00    ~10     -62     -62       21.6  23.6
+        7  50      60       49.68    12.8    -100.76 -46.95    21.8  23.7
+        8  59.98   50.02    59.52    15.4    -40.34  -105.8    21.6  23.6
+        9  100.2   10       100.20   44.0      NA      NA      21.3  20.6
+        10 200.3   5        200.30   89.4      NA      NA      20.6  20.1
+        11 381     2.63     380.95   174.2     NA      NA      20.2  19.9
+        12 504     1.99     503.8    234.0     NA      NA      19.9  19.4
+        13 1007    0.993    1007.00  502       NA      NA      19.5  18.8
+        14 2597    0.385    2597.00  1664.0    NA      NA      18.7  18.0
+        15 5208    0.321    3115     2182      NA      NA      18.3  17.9
+        16 10417   0.225    4444     3944      NA      NA      17.9  17.4
+        17 15625   0.193    5181     5164      NA      NA      17.7  17.2
+        18 31250   0.161    6211     6776      NA      NA      17.5  17.0
+        ==================================================================
+    
+        SR: the sample rate index passed to the ADCplate
+        Fdata: the sample rate IF ONLY ONE CHANNEL IS ENABLED
+        Ts: the settling time in milliseconds
+        Fmux: the sample rate if more than one channel is enabled
+        fc: the cutoff frequency of the digital filter
+        50Hz Rej: the amount of attenuation (in dB) at 50 Hz
+        60Hz Rej: the amount of attenuation (in dB) at 60 Hz
+        Venb: the equivalent number of bits of a voltage measurement
+        Ienb: the equivalent number of bits of a current measurement
+
+    enableINPUT(addr,input) - enable a configured input
+    disableINPUT(addr,input) - disable a configured input
+    readSINGLE(addr,input,sampleRate-optional) - reads a single analog input 
+        even if it is not enabled. If the optional sample rate argument is not
+        included in the function call, the ADCplate will use the existing
+        configuration. This function does not affect any other preconfigured
+        channels.
+    startSINGLE(addr,input,sampleRate-optional) - starts the measurement of a
+        single analog input even if it is not enabled. When combined with event
+        monitoring and the getSINGLE function, this is the recommended method of
+        performing high precision measurements. If the optional sample rate
+        argument is not included in the function call, the ADCplate will use the
+        existing configuration. This function does not affect any other
+        preconfigured channels.
+    getSINGLE(addr,input) - returns the measurement of a single analog input
+        initiated by the startSINGLE function.
+    readSCAN(addr) - performs a scan and returns a list of all 16 possible
+        analog inputs. The value of each enabled channel will appear in the
+        list. All disabled channels will have have a value of 'None'.
+    startSCAN(addr) - starts a scan of all of the enabled channels. When
+        combined with event monitoring and the getSCAN function, this is the
+        recommended method of performing high precision measurements on multiple
+        channels.
+    getSCAN(addr) - returns a list of all 16 possible analog inputs collected
+        by the startSCAN function. The value of each enabled channel will
+        appear in the list. All disabled channels will have have a value of
+        'None'.
+    startBLOCK(addr,num) - intitates a block read of all enabled channels. The
+        num argument can range from 1 to 8192. This function must be used with
+        the getBLOCK function and event monitoring. This is the most effective
+        function to use for high speed measurements of a single channel.
+    getBLOCK(addr) - returns a list of all of the measurements collected by the
+        start block function. The returned data is a sequential list of all the
+        enabled channels.
+    startSTREAM(addr,num) - places the ADCplate in streaming mode. The ADC
+        continuously samples and generates an event whenever the FIFO is half
+        full. The 'num' argument informs the ADC plate the amount of data in the
+        FIFO that triggers an event. This value can range from 1 to 4096 values.
+        A smaller buffer will produce "fresher" data but requires more overhead.
+        A large buffer will require less overhead since reads of the ADCplate
+        occur less often. Note that startSTREAM must be used with the getSTREAM
+        function and event monitoring.
+    getSTREAM(addr) - returns an N-sized list of streamed values. The number of
+        values is set by the num argument in the startSTREAM function. The
+        returned data is a sequential list of all the enabled channels.
+    stopSTREAM(addr) - stops the stream and resets the ADCplate
+    
+    -----------------------------TRIGGER FUNCTIONS------------------------------
+    When trigger mode is used, the ADCplate will automatically perform a single
+    scan of all enabled channels when a trigger occurs. Trigger sources can be
+    an external signal on the trigger input pin or can be be generated
+    internally with a separate clock or a software trigger. 
+    
+    configTRIG(addr,mode,primary - optional) - configures the trigger mode of
+        the ADCplate at the assigned address. Modes include:
+        'EXT' - the scan will start when a low to high pulse occurs on the
+            trigger pin.
+        'SW' - the scan starts when the swTRIGGER function is called
+        'CLOCKED' - an internal clock triggers scans at a rate configured by
+            the triggerFREQ function.
+        'OFF' - disables the trigger mode.
+        If the optional primary argument is set to True, the ADCplate will
+            output a clock signal to the trigger terminal when in 'CLOCKED'
+            mode or a pulse when in 'SW' mode. 
+    startTRIG(addr) - places the addressed ADCplate in trigger mode. A call to
+        configTRIG must occur before calling this function. Once trigger mode
+        has been initiated, a combination of event monitoring and getSCAN calls
+        should be used to read the data collected by the ADCplate. Please see
+        the user's manual for more details and examples.
+    stopTRIG(addr) - stops trigger mode on the addressed ADCplate.
+    triggerFREQ(addr,freq) - sets the internally generated trigger clock rate
+        and returns the actual value set (the clock has a limited 16-bit
+        resolution). The frequency should be greater than zero and less than
+        1000Hz. The user must be careful not to clock faster than scans can be
+        performed. 
+    maxTRIGfreq(addr) - returns a value of the highest possible trigger rate
+        based on the currently enabled channels.
+    swTRIGGER(addr) - if configured in 'SW' mode, this instructs the addressed
+        ADCplate to trigger a scan. If the ADCplate is the trigger primary, a
+        pulse will be issued on the trigger terminal to signal other ADCplates.
+
+Functions Common to All ADC Modes
+    initADC(addr) - initializes all ADC registers and variables in the Python
+        module and on the ADCplate. After execution, the ADCplate will be in
+        'MED' easy mode.
+        
+    ------------------------------EVENT MONITORING------------------------------
+    Events are used by the ADCplate to signal the completion of a requested
+    set of measurements or a rising edge on one or more of the digital inputs.
+    When an event occurs, a GPIO pin on the Raspberry Pi is pulled low.
+    Once this change is detected, the function getEVENTS must be called to
+    determine the source of the event and to release the GPIO pin. For a
+    given ADCplate, an event can be configured to pull down on a pin shared
+    by all other Pi-Plates (GPIO22) or it can use a dedicated GPIO to
+    simplify the querying process. If selected, the dedicated GPIO pins for
+    each ADCplate are:
+                        --------------------------
+                        | Address | GPIO | Pin # |
+                        |---------|------|-------|
+                        |    0    |  5   |  29   |
+                        |    1    |  6   |  31   |
+                        |    2    |  13  |  33   |
+                        |    3    |  19  |  35   |
+                        |    4    |  26  |  37   |
+                        |    5    |  21  |  40   |
+                        |    6    |  20  |  38   |
+                        |    7    |  16  |  36   |
+                        --------------------------
+                        
+    enableEVENTS(addr,signal - optional) - the ADCplate will pull down the
+        selected GPIO pin if an enabled event occurs. If included, the signal
+        argument can be either SHARED (use GPIO22) or DEDICATED (refer to table
+        above). If the optional signal argument is omitted, the ADCplate will
+        use the last selected pin. At power up or after an initADC, this will
+        default to SHARED. 
+    disableEVENTS(addr) - the ADCplate will stop signaling events on the
+        selected pin if an enabled event occurs.
+    check4EVENTS(addr) - reads the status of the enabled event pin and returns
+        True if an event has occurred or a False if there is no change.
+    getEVENTS(addr) - this returns the event status register of the addressed
+        ADCplate. This function must be used after every detected event to
+        clear the selected pin. The bits in the events status register are
+        mapped as follows:
+        --------------------------------------------------------- 
+        | bit7 | bit6 | bit5 | bit4 | bit3 | bit2 | bit1 | bit0 |
+        |-------------------------------------------------------|
+        | ADC  |  NA  |  NA  |  NA  | DIN3 | DIN2 | DIN1 | DIN0 |
+        ---------------------------------------------------------    
+    
+Digital Input Functions
+    getDINbit(addr,bit) - returns the value of the digital input on the 
+       specified bit input. Allowable bit values are 0-4. The returned value is 
+       1 for a high input and 0 for a low input.
+                          
+    getDINall(addr) - returns all of the digital inputs as an 8-bit number. Bit
+        0 is the least significant bit (LSB) and bit 7 is the most significant
+        bit:         ————————————————————
+                     |NA|NA|NA|4|3|2|1|0|
+                     ————————————————————     
+    enableDINevent(addr, bit) - enables a specific digital input to generate an
+        event on a low to high transition. Allowable bit values are 0-3.
+
+    disableDINevent(addr, bit) - disables the specified digital input from
+        generating events. Allowable bit values are 0-3.
+
+LED Control Functions
+    setLED(addr) - turn on the LED
+    clrLED(addr) - turn off the LED
+    toggleLED(addr) - if LED is on, turn off. If LED is off, turn on.
+
+System Level Functions:
+    getID(addr) - return Pi-Plate descriptor string
+    getFWrev(addr) - return FW revision in byte format
+    getHWrev(addr) - return HW revision in byte format
+    getVersion() - returns revision of python module
+    getADDR(addr) - return address of pi-plate. Used for polling available boards at power up.
+    RESET(addr) - set ADCplate to power on state.

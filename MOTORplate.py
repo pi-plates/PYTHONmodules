@@ -1,32 +1,53 @@
-import spidev
 import time
 import string
 import site
 import sys
+import os
+import subprocess
+
+file_dir = os.path.dirname(__file__)
+sys.path.append(file_dir)
+
+command = ["cat", "/proc/cpuinfo"]
+output = subprocess.check_output(command)
+for line in output.decode().splitlines():
+    if "Model" in line:
+        model = line.split(":")[1].strip()
+        break    
+#print(model)
+if model.find("Raspberry Pi 5") != -1:
+    import CMD5 as CMD 
+else:
+    import CMD0 as CMD
 from numbers import Number
-import RPi.GPIO as GPIO
 from six.moves import input as raw_input
-GPIO.setwarnings(False)
+from numbers import Number
+from six.moves import input as raw_input
+
 
 #Initialize
-if (sys.version_info < (2,7,0)):
-    sys.stderr.write("You need at least python 2.7.0 to use this library")
+if (sys.version_info < (3,0,0)):
+    sys.stderr.write("This library is only compatible with Python 3")
     exit(1)
     
-GPIO.setmode(GPIO.BCM)
+
 MOTORbaseADDR=16
-ppFRAME = 25
-ppINT = 22
-GPIO.setup(ppFRAME,GPIO.OUT)
-GPIO.setup(ppINT, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-spi = spidev.SpiDev()
-spi.open(0,1)	
-localPath=site.getsitepackages()[0]
-helpPath=localPath+'/piplates/MOTORhelp.txt'
+	
+if (sys.base_prefix == sys.prefix):
+    result = subprocess.run(['pip', 'show', 'Pi-Plates'], stdout=subprocess.PIPE)
+    result=result.stdout.splitlines()
+    result=str(result[7],'utf-8')
+    k=result.find('/home')
+    result=result[k:]
+else:
+    result=site.getsitepackages()[0]
+helpPath=result+'/piplates/MOTORhelp.txt'
 #helpPath='MOTORhelp.txt'
-MPversion=1.4
+
+MPversion=2.0
 # Version 1.4 - made help() function compatible with Python 2 and 3. Fixed getID function
 # Version 1.3 - adjusted timing on command functions to compensate for RPi SPI changes
+# Version 2.0 - Moved I/O operations into separate module for RPi5
 RMAX = 2000
 MAXADDR=8
 motorsPresent = list(range(8))
@@ -445,39 +466,39 @@ def quietPoll():
         rtn = getADDR(i)
         if (rtn==i):
             motorsPresent[i]=1
-            ppFoundCount += 1
-       
+            ppFoundCount += 1    
         
 def getID(addr):
     global MOTORbaseADDR
-    addr=addr+MOTORbaseADDR
-    if (addr>255):
-        return "ERROR: address out of range - must be less than 255"
-    id=""
-    arg = list(range(4))
-    resp = []
-    arg[0]=addr;
-    arg[1]=0x1;
-    arg[2]=0;
-    arg[3]=0;
+    return CMD.getID1(addr+MOTORbaseADDR)    
+    # addr=addr+MOTORbaseADDR
+    # if (addr>255):
+        # return "ERROR: address out of range - must be less than 255"
+    # id=""
+    # arg = list(range(4))
+    # resp = []
+    # arg[0]=addr;
+    # arg[1]=0x1;
+    # arg[2]=0;
+    # arg[3]=0;
 
-    ppFRAME = 25
-    GPIO.output(ppFRAME,True)
-    null=spi.xfer(arg,300000,60)
-    #null = spi.writebytes(arg)
-    count=0
-    time.sleep(.01)
-    while (count<20): 
-        dummy=spi.xfer([00],300000,20)
-        dummy=spi.xfer([00],300000,20)
-        if (dummy[0] != 0):
-            num = dummy[0]
-            id = id + chr(num)
-            count = count + 1
-        else:
-            count=20
-    GPIO.output(ppFRAME,False)
-    return id
+    # ppFRAME = 25
+    # GPIO.output(ppFRAME,True)
+    # null=spi.xfer(arg,300000,60)
+    # #null = spi.writebytes(arg)
+    # count=0
+    # time.sleep(.01)
+    # while (count<20): 
+        # dummy=spi.xfer([00],300000,20)
+        # dummy=spi.xfer([00],300000,20)
+        # if (dummy[0] != 0):
+            # num = dummy[0]
+            # id = id + chr(num)
+            # count = count + 1
+        # else:
+            # count=20
+    # GPIO.output(ppFRAME,False)
+    # return id
 
 def getHWrev(addr):
     global MOTORbaseADDR
@@ -518,23 +539,6 @@ def RESET(addr):
     
 def ppCMDm(addr,cmd,param1,param2,bytes2return):
     global MOTORbaseADDR
-    arg = list(range(4))
-    resp = []
-    arg[0]=addr+MOTORbaseADDR;
-    arg[1]=cmd;
-    arg[2]=param1;
-    arg[3]=param2;
-    GPIO.output(ppFRAME,True)
-    null=spi.xfer(arg,300000,60)
-    #null = spi.writebytes(arg)
-    if bytes2return>0:
-        time.sleep(.0001)
-        for i in range(0,bytes2return):	
-            dummy=spi.xfer([00],500000,20)
-            resp.append(dummy[0])
-    time.sleep(.001)
-    GPIO.output(ppFRAME,False)
-    time.sleep(.001)
-    return resp	   
+    return CMD.ppCMD1(addr+MOTORbaseADDR,cmd,param1,param2,bytes2return)   
 
 quietPoll()    

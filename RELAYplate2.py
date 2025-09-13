@@ -1,9 +1,11 @@
+import spidev
 import time
 import string
 import site
 import sys
 import os
-from six.moves import input as raw_input
+import threading
+from numbers import Number
 import subprocess
 
 file_dir = os.path.dirname(__file__)
@@ -20,15 +22,15 @@ if model.find("Raspberry Pi 5") != -1:
     import CMD5 as CMD 
 else:
     import CMD0 as CMD
+from six.moves import input as raw_input
 
 #Initialize
 if (sys.version_info < (3,0,0)):
-    sys.stderr.write("This library is only compatible with Python 3")
+    sys.stderr.write("This library requires Python3")
     exit(1)
     
-
-RELAYbaseADDR=24
-	
+RELAY2baseADDR=0x48	
+    
 if (sys.base_prefix == sys.prefix):
     result = subprocess.run(['pip', 'show', 'Pi-Plates'], stdout=subprocess.PIPE)
     result=result.stdout.splitlines()
@@ -37,17 +39,19 @@ if (sys.base_prefix == sys.prefix):
     result=result[k:]
 else:
     result=site.getsitepackages()[0]
-helpPath=result+'/piplates/RELAYhelp.txt' 
-#helpPath='RELAYhelp.txt'       #for development only
+helpPath=result+'/piplates/RELAY2help.txt' 
+#helpPath='RELAY2help.txt'       #for development only
 
-RPversion=2.0
+RP2version=2.0
 # Version 1.0   -   initial release
-# Version 1.1 - adjusted timing on command functions to compensate for RPi SPI changes
-# Version 1.2 - removed all code associated with interrupts
-# Version 2.0 - Moved I/O operations into separate module for RPi5
+# Version 2.0   -   Modified to support RPi5
+
 RMAX = 2000
 MAXADDR=8
 relaysPresent = list(range(8))
+DataGood=False
+lock = threading.Lock()
+lock.acquire()
 
 #==============================================================================#
 # HELP Functions	                                                           #
@@ -78,8 +82,8 @@ def help():
     except IOError:
         print ("Can't find help file.")
 
-def getVersion():
-    return RPversion
+def getSWrev():
+    return RP2version
 
 
 #==============================================================================#
@@ -88,21 +92,21 @@ def getVersion():
 def relayON(addr,relay):
     VerifyADDR(addr)
     VerifyRELAY(relay)
-    ppCMDr(addr,0x10,relay,0,0)
+    ppCMDr(addr,0x10,relay-1,0,0)
 
 def relayOFF(addr,relay):
     VerifyADDR(addr)
     VerifyRELAY(relay)
-    ppCMDr(addr,0x11,relay,0,0)
+    ppCMDr(addr,0x11,relay-1,0,0)
     
 def relayTOGGLE(addr,relay):
     VerifyADDR(addr)
     VerifyRELAY(relay)
-    ppCMDr(addr,0x12,relay,0,0)   
+    ppCMDr(addr,0x12,relay-1,0,0)   
 
 def relayALL(addr,relays):
     VerifyADDR(addr)
-    assert ((relays>=0) and (relays<=127)),"Argument out of range. Must be between 0 and 127"
+    assert ((relays>=0) and (relays<=255)),"Argument out of range. Must be between 0 and 255"
     ppCMDr(addr,0x13,relays,0,0)     
  
 def relaySTATE(addr):
@@ -129,39 +133,12 @@ def toggleLED(addr):
 # SYSTEM Functions	                                                           #
 #==============================================================================#     
 def getID(addr):
-    global RELAYbaseADDR
-    return CMD.getID1(addr+RELAYbaseADDR)
-
-# def getID(addr):
-    # global RELAYbaseADDR
-    # VerifyADDR(addr)   
-    # addr=addr+RELAYbaseADDR
-    # id=""
-    # arg = list(range(4))
-    # resp = []
-    # arg[0]=addr;
-    # arg[1]=0x1;
-    # arg[2]=0;
-    # arg[3]=0;
-    # ppFRAME = 25
-    # GPIO.output(ppFRAME,True)
-    # null=spi.xfer(arg,300000,60)
-    # #null = spi.writebytes(arg)
-    # count=0
-# #    time.sleep(.01)
-    # while (count<20): 
-        # dummy=spi.xfer([00],500000,20)
-        # if (dummy[0] != 0):
-            # num = dummy[0]
-            # id = id + chr(num)
-            # count = count + 1
-        # else:
-            # count=20
-    # GPIO.output(ppFRAME,False)
-    # return id
+    global RELAY2baseADDR
+    addr=addr+RELAY2baseADDR
+    return CMD.getID2(addr)
 
 def getHWrev(addr):
-    global RELAYbaseADDR
+    global RELAY2baseADDR
     VerifyADDR(addr)
     resp=ppCMDr(addr,0x02,0,0,1)
     rev = resp[0]
@@ -170,7 +147,7 @@ def getHWrev(addr):
     return whole+point/10.0	 
     
 def getFWrev(addr):
-    global RELAYbaseADDR
+    global RELAY2baseADDR
     VerifyADDR(addr)
     resp=ppCMDr(addr,0x03,0,0,1)
     rev = resp[0]
@@ -179,49 +156,32 @@ def getFWrev(addr):
     return whole+point/10.0
 
 def getVersion():
-    return RPversion      
+    return RP2version      
         
 #==============================================================================#	
 # LOW Level Functions	                                                       #
 #==============================================================================#          
 def VerifyRELAY(relay):
-    assert ((relay>=1) and (relay<=7)),"Relay number out of range. Must be between 1 and 7"
+    assert ((relay>=1) and (relay<=8)),"Relay number out of range. Must be between 1 and 8"
 
 def VerifyADDR(addr):
-    assert ((addr>=0) and (addr<MAXADDR)),"RELAYplate address out of range"
+    assert ((addr>=0) and (addr<MAXADDR)),"RELAY2plate address out of range"
     addr_str=str(addr)
-    assert (relaysPresent[addr]==1),"No RELAYplate found at address "+addr_str
+    assert (relaysPresent[addr]==1),"No RELAY2plate found at address "+addr_str
 
 def ppCMDr(addr,cmd,param1,param2,bytes2return):
-    global RELAYbaseADDR
-    return CMD.ppCMD1(addr+RELAYbaseADDR,cmd,param1,param2,bytes2return)
+    global RELAY2baseADDR
+    return CMD.ppCMD2(addr+RELAY2baseADDR,cmd,param1,param2,bytes2return)
 
-# def ppCMDr(addr,cmd,param1,param2,bytes2return):
-    # global RELAYbaseADDR
-    # arg = list(range(4))
-    # resp = []
-    # arg[0]=addr+RELAYbaseADDR;
-    # arg[1]=cmd;
-    # arg[2]=param1;
-    # arg[3]=param2;
-    # GPIO.output(ppFRAME,True)
-    # null=spi.xfer(arg,300000,60)
-    # #null = spi.writebytes(arg)
-    # if bytes2return>0:
-        # time.sleep(.0001)
-        # for i in range(0,bytes2return):	
-            # dummy=spi.xfer([00],500000,20)
-            # resp.append(dummy[0])
-    # time.sleep(.001)
-    # GPIO.output(ppFRAME,False)
-    # time.sleep(.001)
-    # return resp    
+#def ppCMDr(addr,cmd,param1,param2,bytes2return,slow=None):
     
 def getADDR(addr):
-    global RELAYbaseADDR
+    global RELAY2baseADDR
     resp=ppCMDr(addr,0x00,0,0,1)
-    return resp[0]-RELAYbaseADDR
-
+    if (CMD.DataGood):
+        return resp[0]-RELAY2baseADDR
+    else:
+        return 8
     
 def quietPoll():   
     global relaysPresent

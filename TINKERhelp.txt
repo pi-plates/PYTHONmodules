@@ -90,7 +90,6 @@ the chan argument.
 
 toggleLED(addr,chan)– toggles the state of the LED connected to the channel 
 called out in the chan argument. If the LED was OFF before this command was 
-
 issued then it will be turned ON afterwards. Conversely, if the LED was ON 
 before this command was issued then it will be turned OFF afterwards.
 

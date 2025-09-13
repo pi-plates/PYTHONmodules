@@ -77,11 +77,16 @@ fanSTATE(0) - returns a 1 if the fan is on and a 0 if it is off.
 >>>Pushbutton / Power Control<<<
 getSWstate(0) - this function provides a programmatic method of reading the
 status of the button. Returns a 1 if the button is pressed and a 0 otherwise.
-enablePOWERSW(0) - this tells the POWERplate to initiate the power control
+enablePOWERSW(0,BYPASS) - this tells the POWERplate to initiate the power control
 functions when the pushbutton is held down for 3 seconds. This setting is saved
-on the POWERplate and will be retained between power cycles. This function only
-works correctly if the line dtoverlay=gpio-shutdown,gpio_pin=24 has been added
-to the end of the /boot/config.txt file.
+on the POWERplate and will be retained between power cycles. This function only
+works correctly if the line dtoverlay=gpio-shutdown,gpio_pin=24 has been added
+to the end of the /boot/config.txt file. Note that if the
+optional variable BYPASS is set to True, the POWERplate will bypass the switch
+and power up the stack whenever a DC supply is initially plugged in. If set to
+False, the POWERplate will wait for the user to hold the button down for 3
+seconds before applying power to the rest of the stack. The default
+BYPASS value is True.
 disablePOWERSW(0) - this disables pushbutton control of power. This setting is
 saved on the POWERplate and will be retained between power cycles.
 setSHUTDOWNdelay(0,delay) - by default, after the POWERplate instructs the

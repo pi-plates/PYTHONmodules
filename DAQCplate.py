@@ -3,37 +3,55 @@ import time
 import string
 import site
 import sys
-import RPi.GPIO as GPIO
+import os
+import subprocess
+
+file_dir = os.path.dirname(__file__)
+sys.path.append(file_dir)
+
+command = ["cat", "/proc/cpuinfo"]
+output = subprocess.check_output(command)
+for line in output.decode().splitlines():
+    if "Model" in line:
+        model = line.split(":")[1].strip()
+        break    
+#print(model)
+if model.find("Raspberry Pi 5") != -1:
+    import CMD5 as CMD 
+else:
+    import CMD0 as CMD
 from six.moves import input as raw_input
-GPIO.setwarnings(False)
 
 #Initialize
-if (sys.version_info < (2,7,0)):
-    sys.stderr.write("You need at least python 2.7.0 to use this module")
+if (sys.version_info < (3,0,0)):
+    sys.stderr.write("This module must be used with Python 3.")
     exit(1)
     
-GPIO.setmode(GPIO.BCM)
 GPIObaseADDR=8
-ppFRAME = 25
-ppINT = 22
-GPIO.setup(ppFRAME,GPIO.OUT)
-GPIO.output(ppFRAME,False)  #Initialize FRAME signal
-GPIO.setup(ppINT, GPIO.IN, pull_up_down=GPIO.PUD_UP)    #reserve interrupt input
-spi = spidev.SpiDev()
-spi.open(0,1)	
-localPath=site.getsitepackages()[0]
-helpPath=localPath+'/piplates/DAQChelp.txt'
+
+if (sys.base_prefix == sys.prefix):
+    result = subprocess.run(['pip', 'show', 'Pi-Plates'], stdout=subprocess.PIPE)
+    result=result.stdout.splitlines()
+    result=str(result[7],'utf-8')
+    k=result.find('/home')
+    result=result[k:]
+else:
+    result=site.getsitepackages()[0]
+helpPath=result+'/piplates/DAQChelp.txt'
 #helpPath='DAQChelp.txt'
-DAQCversion=1.5
+
+DAQCversion=2.0
 #Version 1.5 - fixed read issues with getaADCall and getID
 #Version 1.4 - added Python 3 compatibility
+#Version 2.0 - modified GPIO signalling to accomodate the RPi 5
 daqcsPresent = list(range(8))
 Vcc=list(range(8))
 MAXADDR=8
 	
 def CLOSE():
-	spi.close()
-	GPIO.cleanup()
+    spi.close()
+#    ppFRAME.release()
+#    ppSRQ.release()
 
 def Help():
 	help()
@@ -69,7 +87,6 @@ def help():
 def getADC(addr,channel):
     VerifyADDR(addr)
     VerifyAINchannel(channel)
-	
     resp=ppCMD(addr,0x30,channel,0,2)
     value=(256*resp[0]+resp[1])
     value=round(value*4.096/1024,3)
@@ -78,7 +95,7 @@ def getADC(addr,channel):
     return value
 
 def getADCall(addr):
-    value=list(range(8))
+    value=8*[0]
     VerifyADDR(addr)    
     #resp=ppCMD(addr,0x31,0,0,16)
     for i in range (0,8):
@@ -334,32 +351,7 @@ def getADDR(addr):
 	
 def getID(addr):
     global GPIObaseADDR
-    VerifyADDR(addr)
-    addr=addr+GPIObaseADDR
-    id=""
-    arg = list(range(4))
-    resp = []
-    arg[0]=addr;
-    arg[1]=0x1;
-    arg[2]=0;
-    arg[3]=0;
-    ppFRAME = 25
-    GPIO.output(ppFRAME,True)
-    #null = spi.writebytes(arg)
-    null=spi.xfer(arg,300000,60)
-    count=0
-#    time.sleep(.0001)
-    while (count<20): 
-        dummy=spi.xfer([00],300000,20)
-#        time.sleep(.0001)
-        if (dummy[0] != 0):
-            num = dummy[0]
-            id = id + chr(num)
-            count = count + 1
-        else:
-            count=20
-    GPIO.output(ppFRAME,False)
-    return id	
+    return CMD.getID1(addr+GPIObaseADDR)
 	
 def getPROGdata(addr,paddr):	#read a byte of data from program memory
     VerifyADDR(addr)
@@ -372,7 +364,7 @@ def Poll():
     for i in range (0,8):
         rtn = getADDR(i)
         if ((rtn-8)==i):
-            print ("DAQCplate found at address",rtn-8)
+            #print ("DAQCplate found at address",rtn-8)
             ppFoundCount += 1
     if (ppFoundCount == 0):
         print ("No DAQCplates found")
@@ -391,27 +383,11 @@ def VerifyADDR(addr):
     addr_str=str(addr)
     assert (daqcsPresent[addr]==1),"No DAQCplate found at address "+addr_str
 	
+
 def ppCMD(addr,cmd,param1,param2,bytes2return):
     global GPIObaseADDR
-    arg = list(range(4))
-    resp = []
-    arg[0]=addr+GPIObaseADDR;
-    arg[1]=cmd;
-    arg[2]=param1;
-    arg[3]=param2;
-    #    time.sleep(.0005)
-    GPIO.output(ppFRAME,True)
-    null=spi.xfer(arg,300000,40)
-    #null = spi.writebytes(arg)   
-    if bytes2return>0:
-        time.sleep(.0001)        
-        for i in range(0,bytes2return):	
-            dummy=spi.xfer([00],500000,20)
-            resp.append(dummy[0])        
-    GPIO.output(ppFRAME,False)
-    time.sleep(.0003)
-    return resp	
-	
+    return CMD.ppCMD1(addr+GPIObaseADDR,cmd,param1,param2,bytes2return)
+    	
 
 def Init():	
     global daqcsPresent
@@ -430,6 +406,5 @@ def Init():
             setDOUTall(i,0)
             setPWM(i,0,0)
             setPWM(i,1,0)
-
     
 Init()

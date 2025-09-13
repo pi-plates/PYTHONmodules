@@ -4,8 +4,8 @@ import string
 import site
 import sys
 import os
-import subprocess
 from gpiozero import CPUTemperature
+import subprocess
 
 file_dir = os.path.dirname(__file__)
 sys.path.append(file_dir)
@@ -37,14 +37,13 @@ if (sys.base_prefix == sys.prefix):
     result=result[k:]
 else:
     result=site.getsitepackages()[0]
-helpPath=result+'/piplates/POWERhelp.txt'
-
-#helpPath='POWERhelp.txt'       #for development only
+helpPath=result+'/piplates/POWER24help.txt'
+#helpPath='POWER24help.txt'       #for development only
 
 POWERversion=2.0
 # Version 1.0   -   initial release
-# Version 1.1   -   added optional argument to Button Setup
 # Version 2.0   -   Modified to support RPi5
+
 DataGood=False
 cpu = CPUTemperature()
 
@@ -55,6 +54,7 @@ RMAX = 2000
 MAXADDR=8
 
 powerPresent = 0
+powerType=24
 
 def Help():
 	help()
@@ -92,10 +92,24 @@ def getVin(addr=None):
     return value   
 
 def getIin(addr=None):
-    resp=ppCMD(0,0x30,1,0,2)
-    value=(256*resp[0]+resp[1])
-    value=round((value*2.4*2.0/4095),3)
-    return value     
+    if(powerType==24):
+        print ("This function is not supported by the POWERplate24")
+        return
+    else:
+        resp=ppCMD(0,0x30,1,0,2)
+        value=(256*resp[0]+resp[1])
+        value=round((value*2.4*2.0/4095),3)
+        return value     
+
+def getHVin(addr=None):
+    if(powerType==24):
+        resp=ppCMD(0,0x30,1,0,2)
+        value=(256*resp[0]+resp[1])
+        value=round((value*2.4*12.4573/4095),3)
+    else:
+        print ("This function is only supported by the POWERplate24")
+        value=0        
+    return value   
 
 def getCPUtemp(addr=None):
     return cpu.temperature
@@ -182,7 +196,7 @@ def setSHUTDOWNdelay(addr,delay):
     resp=ppCMD(0,0x55,delay,0,0)
 
 def enablePOWERSW(addr, bypass=None):
-    if (getFWrev(addr)>=1.1):
+    if (getFWrev(addr)>=1.2):
         if (bypass==None):
             bypass=True
         else:
@@ -201,7 +215,50 @@ def disablePOWERSW(addr=None):
 def powerOFF(addr=None):
     resp=ppCMD(0,0x56,0,0,0)
     
+#==============================================================================#	
+# POWER Status Functions - only for POWERplate24                               #
+#==============================================================================# 
+ 
+def statEnable(addr=None):	#POWERplate24 will pull down on STAT pin if an enabled event occurs
+    if(powerType==24):
+        resp=ppCMD(addr,0x04,0,0,0)
+    else:
+        print ("This function is only supported by the POWERplate24")       
+	
+def statDisable(addr=None):   #POWERplate24 will not assert STAT
+    if(powerType==24):
+        resp=ppCMD(addr,0x05,0,0,0)
+    else:
+        print ("This function is only supported by the POWERplate24") 
+    
+def getPOWchange(addr=None):	#read Power status change register in POWERplate24 - this clears stat change line and the register
+    if(powerType==24):
+        resp=ppCMD(addr,0x06,0,0,1)
+        value=(resp[0])
+    else:
+        print ("This function is only supported by the POWERplate24")
+        value=0
+    return value 
+    
+def getPOWstatus(addr=None):	#read curent power status register in POWERplate24
+    if(powerType==24):
+        resp=ppCMD(addr,0x07,0,0,1)
+        value=(resp[0])
+    else:
+        print ("This function is only supported by the POWERplate24")
+        value=0
+    return value 
 
+def getSTATflag(addr=None):
+    if(powerType==24):
+        if (GPIO.input(ppINT)==1):
+            value=False
+        else:
+            value=True
+    else:
+        print ("This function is only supported by the POWERplate24")
+        value=0
+    return value 
  
 #==============================================================================#	
 # LOW Level Functions	                                                       #
@@ -214,7 +271,6 @@ def VerifyADDR(addr):
     addr_str=str(addr)
     assert (powerPresent==1),"No POWERplate found"
     
-
 def ppCMD(addr,cmd,param1,param2,bytes2return):
     return CMD.ppCMD2(addr,cmd,param1,param2,bytes2return)
  
@@ -239,7 +295,7 @@ def getHWrev(addr):
     return whole+point/10.0
 
 def getVersion():
-    return POWERversion
+    return POWER24version
     
 def readFLASH(addr,flashadddr):
     global POWERbaseADDR
@@ -254,15 +310,18 @@ def getADDR():
     resp=ppCMD(0,0x00,0,0,1)
     #print resp, DataGood;
     if (CMD.DataGood):
-        return resp[0]
+        return resp[0]        
     else:
         return 8
     
 def quietPoll():   
-    global powerPresent
+    global powerPresent, powerType
     rtn = getADDR()
     if (rtn==0):           
-        powerPresent=1   
+        powerPresent=1
+        id=getID(0)
+        if (id.find('24')>0):
+            powerType=24      
         setRTC(0,'l')       
 
 def RESET(addr):
@@ -271,4 +330,4 @@ def RESET(addr):
     time.sleep(1)
     quietPoll()
 
-quietPoll()            
+quietPoll()          

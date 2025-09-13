@@ -4,36 +4,52 @@ import string
 import site
 import sys
 import math
+import os
 from numbers import Number
-import RPi.GPIO as GPIO
+import subprocess
+
+file_dir = os.path.dirname(__file__)
+sys.path.append(file_dir)
+
+command = ["cat", "/proc/cpuinfo"]
+output = subprocess.check_output(command)
+for line in output.decode().splitlines():
+    if "Model" in line:
+        model = line.split(":")[1].strip()
+        break    
+#print(model)
+if model.find("Raspberry Pi 5") != -1:
+    import CMD5 as CMD 
+else:
+    import CMD0 as CMD
 from six.moves import input as raw_input
-GPIO.setwarnings(False)
 
 #Initialize
-if (sys.version_info < (2,7,0)):
-    sys.stderr.write("You need at least python 2.7.0 to use this library")
+if (sys.version_info < (3,0,0)):
+    sys.stderr.write("This library requires Python3")
     exit(1)
-    
-GPIO.setmode(GPIO.BCM)
+
 THERMObaseADDR=40
-ppFRAME = 25
-ppINT = 22
-ppACK = 23
-GPIO.setup(ppFRAME,GPIO.OUT)
-GPIO.output(ppFRAME,False)  #Initialize FRAME signal
-time.sleep(.001)            #let Pi-Plate reset SPI engine if necessary
-GPIO.setup(ppINT, GPIO.IN, pull_up_down=GPIO.PUD_UP)    #Initialize SRQ input and ACK
-GPIO.setup(ppACK, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-spi = spidev.SpiDev()
-spi.open(0,1)	
-localPath=site.getsitepackages()[0]
-helpPath=localPath+'/piplates/THERMOhelp.txt'
+
+if (sys.base_prefix == sys.prefix):
+    result = subprocess.run(['pip', 'show', 'Pi-Plates'], stdout=subprocess.PIPE)
+    result=result.stdout.splitlines()
+    result=str(result[7],'utf-8')
+    k=result.find('/home')
+    result=result[k:]
+else:
+    result=site.getsitepackages()[0]
+helpPath=result+'/piplates/THERMOhelp.txt'
 #helpPath='THERMOhelp.txt'       #for development only
-THERMOversion=1.3
+
+THERMOversion=2.1
 #1.0 - initial release
 #1.1 - added line frequency options
 #1.2 - added data smoothing options
 #1.3 - fixed coefficients in type K conversion polynomial for T>500C. 
+#2.0 - Modified to support RPi5
+#2.1 - Fixed bug where path to help files was broken when modules were
+#      installed using "pip install --break-package-system"
 
 DataGood=False
 #tType='k'   #Default thermocouple is type K
@@ -318,76 +334,26 @@ def setINT(addr):
 def clrINT(addr):
     VerifyADDR(addr)
     resp=ppCMD(addr,0xF5,0,0,0)
-	
+
 def getID(addr):
     global THERMObaseADDR
-    VerifyADDR(addr)
     addr=addr+THERMObaseADDR
-    id=""
-    arg = list(range(4))
-    resp = []
-    arg[0]=addr;
-    arg[1]=0x1;
-    arg[2]=0;
-    arg[3]=0;
-    DataGood=True
-    t0=time.time()
-    wait=True
-    while(wait):
-        if (GPIO.input(ppACK)==1):              
-            wait=False
-        if ((time.time()-t0)>0.05):   #timeout
-            wait=False
-            DataGood=False
-    if (DataGood==True): 
-        ppFRAME = 25
-        GPIO.output(ppFRAME,True)
-        null=spi.xfer(arg,500000,50)
-        #DataGood=True
-        t0=time.time()
-        wait=True
-        while(wait):
-            if (GPIO.input(ppACK)!=1):              
-                wait=False
-            if ((time.time()-t0)>0.05):   #timeout
-                wait=False
-                DataGood=False
-        if (DataGood==True):
-            count=0 
-            csum=0
-            go=True
-            while (go): 
-                dummy=spi.xfer([00],500000,40)
-                if (dummy[0] != 0):
-                    num = dummy[0]
-                    csum += num
-                    id = id + chr(num)
-                    count += 1
-                else:
-                    dummy=spi.xfer([00],500000,40)  
-                    checkSum=dummy[0]                
-                    go=False 
-                if (count>25):
-                    go=False
-                    DataGood=False
-            if ((~checkSum & 0xFF) != (csum & 0xFF)):
-                DataGood=False
-        GPIO.output(ppFRAME,False)
-    return id   
- 
- 
+    return CMD.getID2(addr)
+	
 #==============================================================================#
 # Flash Memory Functions - used for calibration constants                      #
 #==============================================================================#
 def CalGetByte(addr,ptr):
     VerifyADDR(addr)
     assert ((ptr>=0) and (ptr<=255)),"Calibration pointer is out of range. Must be in the range of 0 to 255" 
+    time.sleep(0.01)
     resp=ppCMD(addr,0xFD,2,ptr,1)
     return resp[0]
     
 def CalPutByte(addr,data):
     VerifyADDR(addr)
     assert ((data>=0) and (data<=255)),"Calibration value is out of range. Must be in the range of 0 to 255"
+    time.sleep(0.01)
     resp=ppCMD(addr,0xFD,1,data,0)
     
 def CalEraseBlock(addr):
@@ -401,59 +367,10 @@ def VerifyADDR(addr):
     assert ((addr>=0) and (addr<MAXADDR)),"THERMOplate address out of range"
     addr_str=str(addr)
     assert (THERMOsPresent[addr]==1),"No THERMOplate found at address "+addr_str
-    
+
 def ppCMD(addr,cmd,param1,param2,bytes2return):
     global THERMObaseADDR
-    global DataGood
-    DataGood=True
-    arg = list(range(4))
-    resp = []
-    arg[0]=addr+THERMObaseADDR;
-    arg[1]=cmd;
-    arg[2]=param1;
-    arg[3]=param2;
-    DataGood=True
-    t0=time.time()
-    wait=True    
-    while(wait):
-        if (GPIO.input(ppACK)==1):              
-            wait=False
-        if ((time.time()-t0)>0.05):   #timeout
-            wait=False
-            DataGood=False
-    if (DataGood==True):
-        ppFRAME = 25    
-        GPIO.output(ppFRAME,True)
-        null=spi.xfer(arg,500000,5)
-        #DataGood=True
-        t0=time.time()
-        wait=True
-        while(wait):
-            if (GPIO.input(ppACK)!=1):
-                wait=False
-            if ((time.time()-t0)>0.05):   #timeout
-                wait=False
-                DataGood=False    
-        if (bytes2return>0) and DataGood:
-            t0=time.time()
-            wait=True
-            while(wait):
-                if (GPIO.input(ppACK)!=1):              
-                    wait=False
-                if ((time.time()-t0)>0.08):   #timeout
-                    wait=False
-                    DataGood=False
-            if (DataGood==True):
-                for i in range(0,bytes2return+1):	
-                    dummy=spi.xfer([00],500000,5)
-                    resp.append(dummy[0])
-                csum=0;
-                for i in range(0,bytes2return):
-                    csum+=resp[i]
-                if ((~resp[bytes2return]& 0xFF) != (csum & 0xFF)):
-                    DataGood=False
-        GPIO.output(ppFRAME,False)
-    return resp
+    return CMD.ppCMD2(addr+THERMObaseADDR,cmd,param1,param2,bytes2return)
 
 def verifyTC(addr,channel):
     VerifyADDR(addr)
@@ -470,7 +387,7 @@ def verifyTC(addr,channel):
 def getADDR(addr):
     global THERMObaseADDR
     resp=ppCMD(addr,0x00,0,0,1)
-    if (DataGood):
+    if (CMD.DataGood):
         return resp[0]-THERMObaseADDR
     else:
         return 8

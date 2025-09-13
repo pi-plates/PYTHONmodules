@@ -6,11 +6,23 @@ import sys
 import math
 from numbers import Number
 import os
+import subprocess
 
 file_dir = os.path.dirname(__file__)
 sys.path.append(file_dir)
 
-from BASE import *
+command = ["cat", "/proc/cpuinfo"]
+output = subprocess.check_output(command)
+for line in output.decode().splitlines():
+    if "Model" in line:
+        model = line.split(":")[1].strip()
+        break    
+#print(model)
+if model.find("Raspberry Pi 5") != -1:
+    from BASE5 import * 
+else:
+    from BASE0 import *
+    
 from A2D import *
 from LED import *
 from RELAY import *
@@ -19,7 +31,7 @@ from PWM import *
 from SERVO import *
 from RANGE import *
 from TEMP import *
-from METER import *
+#from METER import *
 from ANFUNC import *
 from BUTTON import *
 
@@ -28,11 +40,20 @@ if (sys.version_info < (3,0,0)):
     sys.stderr.write("This library is only compatible with Python 3.")
     exit(1)  
 
-localPath=site.getsitepackages()[0]
-helpPath=localPath+'/piplates/TINKERhelp.txt'
+if (sys.base_prefix == sys.prefix):
+    result = subprocess.run(['pip', 'show', 'Pi-Plates'], stdout=subprocess.PIPE)
+    result=result.stdout.splitlines()
+    result=str(result[7],'utf-8')
+    k=result.find('/home')
+    result=result[k:]
+else:
+    result=site.getsitepackages()[0]
+helpPath=result+'/piplates/TINKERhelp.txt' 
 #helpPath='TINKERhelp.txt'       #for development only
-TINKERversion=1.0
-#DataGood=False
+
+TINKERversion=2.0
+# Version 1.0   -   initial release
+# Version 2.0   -   Modified to support RPi5
 
 dModes=['din','dout','button','pwm','range','temp','servo','rgbled','motion']
 pcaRequired=[0,0,0,1,0,0,0,0,0]
@@ -40,10 +61,6 @@ chanModes=['din','din','din','din','din','din','din','din']
 pcaMap=[0,1,2,3,4,5,6,6]
 
 #RMAX = 2000
-
-def CLOSE():
-	spi.close()
-	GPIO.cleanup()
 
 def Help():
 	help()

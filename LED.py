@@ -1,8 +1,21 @@
 import os
 import sys
+import subprocess
+
 file_dir = os.path.dirname(__file__)
 sys.path.append(file_dir)
-from BASE import *
+
+command = ["cat", "/proc/cpuinfo"]
+output = subprocess.check_output(command)
+for line in output.decode().splitlines():
+    if "Model" in line:
+        model = line.split(":")[1].strip()
+        break    
+#print(model)
+if model.find("Raspberry Pi 5") != -1:
+    from BASE5 import * 
+else:
+    from BASE0 import *
 from DIO  import *
 from PWM import *
 

@@ -1,0 +1,31 @@
+CURRENTplate Help Revision 1.0
+
+Definitions:
+    addr: Address - the CURRENTplate has a set of jumpers on the board that allow
+        its address to be set to a value between 0 and 7.
+    channel: Each CURRENTplate has eight individually addressable input
+        channels numbered 1 through 8.
+
+4-20mA Current Measurement Functions
+    getI(addr,channel) - returns the value of loop current (in milliamps)
+        measured on the specified channel. The output range is 0 to 24. Note 
+        that returned values below 4mA will not be accurate.
+       
+    getIall(addr) - returns a list of the loop current values (in milliamps) for
+        all eight channels on the CURRENTplate. The output range of each
+        measurement is 0 to 24. Again, returned values below 4mA will not be
+        accurate.
+    
+LED Control Functions
+    setLED(addr) - turn on the LED
+    clrLED(addr) - turn off the LED
+    toggleLED(addr) - if LED is on, turn off. If LED is off, turn on.
+
+System Level Functions:
+    getID(addr) - return Pi-Plate descriptor string
+    getFWrev(addr) - return FW revision in byte format
+    getHWrev(addr) - return HW revision in byte format
+    getVersion() - returns revision of python module
+    getADDR(addr) - return address of pi-plate. Used for polling available
+        boards at power up.
+    RESET(addr) - set CURRENTplate to power on state.

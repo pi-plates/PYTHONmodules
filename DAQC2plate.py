@@ -1,34 +1,54 @@
-import spidev
 import time
 import string
 import site
 import sys
+import subprocess
+import os
+
+file_dir = os.path.dirname(__file__)
+sys.path.append(file_dir)
+
+command = ["cat", "/proc/cpuinfo"]
+output = subprocess.check_output(command)
+for line in output.decode().splitlines():
+    if "Model" in line:
+        model = line.split(":")[1].strip()
+        break    
+#print(model)
+if model.find("Raspberry Pi 5") != -1:
+    import CMD5 as CMD 
+else:
+    import CMD0 as CMD
 from numbers import Number
-import RPi.GPIO as GPIO
 from six.moves import input as raw_input
-GPIO.setwarnings(False)
 
 #Initialize
-if (sys.version_info < (2,7,0)):
-    sys.stderr.write("You need at least python 2.7.0 to use this library")
+if (sys.version_info < (3,0,0)):
+    sys.stderr.write("This library is only compatible with Python 3")
     exit(1)
     
-GPIO.setmode(GPIO.BCM)
 DAQC2baseADDR=32
-ppFRAME = 25
-ppINT = 22
-ppACK = 23
-GPIO.setup(ppFRAME,GPIO.OUT)
-GPIO.output(ppFRAME,False)  #Initialize FRAME signal
-time.sleep(.001)            #let Pi-Plate reset SPI engine if necessary
-GPIO.setup(ppINT, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(ppACK, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-spi = spidev.SpiDev()
-spi.open(0,1)	
-localPath=site.getsitepackages()[0]
-helpPath=localPath+'/piplates/DAQC2help.txt'
+	
+if (sys.base_prefix == sys.prefix):
+    result = subprocess.run(['pip', 'show', 'Pi-Plates'], stdout=subprocess.PIPE)
+    result=result.stdout.splitlines()
+    result=str(result[7],'utf-8')
+    k=result.find('/home')
+    result=result[k:]
+else:
+    result=site.getsitepackages()[0]
+helpPath=result+'/piplates/DAQC2help.txt'
 #helpPath='DAQC2help.txt'       #for development only
-DAQC2version=1.0
+
+####################################################################################
+#Version    Description
+#  1.0      Initial release
+#  1.1      Improved download of oscilloscope data to address issues with latest OS
+#  2.0 - Moved I/O operations into separate module for RPi5
+#  2.1 - Fixed bug in getFREQ
+####################################################################################
+DAQC2version=2.1
+
 DataGood=False
 
 RMAX = 2000
@@ -40,10 +60,6 @@ calOffset=[[0 for z in range(8)] for x in range(8)]  #16 bit signed offset calib
 calDAC=[[0 for z in range(8)] for x in range(8)] #16 bit signed DAC calibration values - range is +/-4%
 calSet=list(range(8))
 PWMvals=[[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]]
-
-def CLOSE():
-	spi.close()
-	GPIO.cleanup()
 
 def Help():
 	help()
@@ -292,10 +308,10 @@ def setOSCsweep(addr,rate):
 
 
 def getOSCtraces(addr):  
-    global C1state, C2state
+    global C1state, C2state, DAQC2baseADDR
     cCount=C1state+C2state
     VerifyADDR(addr)
-    resp=ppCMD(addr,0xA4,0,0,cCount*2048)
+    resp=CMD.ppCMDosc(addr+DAQC2baseADDR,0xA4,0,0,cCount*2048)
     if (cCount==2):
         for i in range(1024):
             trace1[i]=resp[4*i]*256+resp[4*i+1]
@@ -329,36 +345,6 @@ def setOSCtrigger(addr,channel,type,edge,level):
     assert (level>=0 and level <=4095),"Invalid trigger level. Must be between 0 and 4095"     
     resp=ppCMD(addr,0xA6,option+(level>>8),level&0xFF,0)
         
-def setOSCtrigpos(addr,position):    # not used at this time
-#position: 10 bit value in range of 0 to 999
-    VerifyADDR(addr)
-    assert (position>=0 and position <=999),"Invalid position. Must be between 0 and 999" 
-    #Assuming a circular buffer with 64 blocks of data then tell DAQC2 how many blocks to
-    #capture after after the trigger is detected. 
-    bCount=int((1000-position)/1000*32+0.5)
-    resp=ppCMD(addr,0xA8,bCount,0,0)
-    
-def setOSCvertical(sensitivity):
-#set vertical scale of display
-#sensitivity values are:
-# 0:  10mV/div
-# 1:  20mV/div
-# 2:  50mV/div
-# 3:  100mV/div
-# 4:  200mV/div
-# 5:  500mV/div
-# 6:  1V/div
-# 7:  2V/div
-# 8:  5V/div
-    assert ((sensitivity>=0) and (sensitivity<=8)),"Vertical sensitivity value out of range. Must be in the range of 0 to 8"
-
-def zoomOSChorizontal(scale):
-#set horizontal zoom
-    assert ((scale>=1) and (scale<=10)),"Horizontal value out of range. Must be in the range of 1 to 10"
-    
-def setOSCoffset(offset):
-#function to move trace up and down on screen
-    assert ((offset>=-10) and (offset<=10)),"Offset value out of range. Must be in the range of -10 to 10"
 
 def trigOSCnow(addr):
     VerifyADDR(addr)
@@ -489,10 +475,10 @@ def getFREQ(addr):
     VerifyADDR(addr)
     freq=0
     resp=ppCMD(addr,0xC0,0,0,2) #get the upper 16 bits
-    if(DataGood):
+    if(CMD.DataGood):
         counts=(resp[0]<<24)+(resp[1]<<16)
         resp=ppCMD(addr,0xC0,1,0,2) #get the lower 16 bits
-        if (DataGood):
+        if (CMD.DataGood):
             counts=counts+(resp[0]<<8)+resp[1]
             if (counts>0):
                 freq=6000000.0/counts
@@ -547,57 +533,16 @@ def clrINT(addr):
 	
 def getID(addr):
     global DAQC2baseADDR
-    VerifyADDR(addr)
     addr=addr+DAQC2baseADDR
-    id=""
-    arg = list(range(4))
-    resp = []
-    arg[0]=addr;
-    arg[1]=0x1;
-    arg[2]=0;
-    arg[3]=0;
-    ppFRAME = 25
-    GPIO.output(ppFRAME,True)
-    null=spi.xfer(arg,500000,50)
-    DataGood=True
-    t0=time.time()
-    wait=True
-    while(wait):
-        if (GPIO.input(ppACK)!=1):              
-            wait=False
-        if ((time.time()-t0)>0.05):   #timeout
-            wait=False
-            DataGood=False
-    if (DataGood==True):
-        count=0 
-        csum=0
-        go=True
-        while (go): 
-            dummy=spi.xfer([00],500000,40)
-            if (dummy[0] != 0):
-                num = dummy[0]
-                csum += num
-                id = id + chr(num)
-                #print count, num
-                count += 1
-            else:
-                dummy=spi.xfer([00],500000,40)  
-                checkSum=dummy[0]                
-                go=False 
-            if (count>25):
-                go=False
-                DataGood=False
-        #print checkSum, ~checkSum & 0xFF, csum & 0xFF
-        if ((~checkSum & 0xFF) != (csum & 0xFF)):
-            DataGood=False
-    GPIO.output(ppFRAME,False)
-    return id   
+    return CMD.getID2(addr)
 
 def getMode(addr):
     VerifyADDR(addr)
     resp=ppCMD(addr,0x08,0,0,1)
     return resp[0]
 
+def getSRQ():
+    return CMD.getSRQ()
     
 #==============================================================================#	
 # Flash Memory Functions - used for calibration constants                      #
@@ -623,7 +568,6 @@ def CalEraseBlock(addr):
 def VerifyAINchannel(ain):
     assert ((ain>=0) and (ain<=8)),"Analog input channel value out of range. Must be in the range of 0 to 8"    
 
-
 def VerifyADDR(addr):
     assert ((addr>=0) and (addr<MAXADDR)),"DAQC2plate address out of range"
     addr_str=str(addr)
@@ -640,54 +584,17 @@ def VerifyFGchannel(chan):
     
 def ppCMD(addr,cmd,param1,param2,bytes2return):
     global DAQC2baseADDR
-    global DataGood
-    DataGood=True
-    arg = list(range(4))
-    resp = []
-    arg[0]=addr+DAQC2baseADDR;
-    arg[1]=cmd;
-    arg[2]=param1;
-    arg[3]=param2;
-    GPIO.output(ppFRAME,True)
-    null=spi.xfer(arg,500000,5)
-    DataGood=True
-    t0=time.time()
-    wait=True
-    while(wait):
-        if (GPIO.input(ppACK)!=1):
-            wait=False
-        if ((time.time()-t0)>0.05):   #timeout
-            wait=False
-            DataGood=False    
-    if (bytes2return>0) and DataGood:
-        t0=time.time()
-        wait=True
-        while(wait):
-            if (GPIO.input(ppACK)!=1):              
-                wait=False
-            if ((time.time()-t0)>0.08):   #timeout
-                wait=False
-                DataGood=False
-        if (DataGood==True):
-            #time.sleep(.0001)
-            for i in range(0,bytes2return+1):	
-                dummy=spi.xfer([00],500000,5)
-                resp.append(dummy[0])
-            csum=0;
-            for i in range(0,bytes2return):
-                csum+=resp[i]
-            if ((~resp[bytes2return]& 0xFF) != (csum & 0xFF)):
-                DataGood=False
-    #time.sleep(.001)
-    GPIO.output(ppFRAME,False)
-    #time.sleep(.001)
-    return resp
+    return CMD.ppCMD2(addr+DAQC2baseADDR,cmd,param1,param2,bytes2return)
+    
+def ppCMDosc(addr,cmd,param1,param2,bytes2return):
+    global DAQC2baseADDR
+    return CMD.ppCMDosc(addr+DAQC2baseADDR,cmd,param1,param2,bytes2return)
+
     
 def getADDR(addr):
     global DAQC2baseADDR
     resp=ppCMD(addr,0x00,0,0,1)
-    #print resp, DataGood;
-    if (DataGood):
+    if (CMD.DataGood):
         return resp[0]-DAQC2baseADDR
     else:
         return 8
@@ -702,7 +609,6 @@ def quietPoll():
             daqc2sPresent[i]=1
             ppFoundCount += 1
             getCalVals(i)
-            #RESET(i)
 
 
 # Function to pull calibration data from flash memory

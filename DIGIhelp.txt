@@ -1,0 +1,68 @@
+DIGIplate Help Revision 1.0
+
+Definitions:
+    addr: Address - the DIGIplate has a set of jumpers on the board that allow
+          its address to be set to a value between 0 and 7.
+    bit: Each DIGIplate has eight individually addressable input channels
+         referred to as bits. They are numbered 1 through 8.
+
+Input Functions
+    getDINbit(addr,bit) - returns the value of the digital input on the 
+                          specified bit input. The returned value is 1 for
+                          a high input and 0 for a low input.
+                          
+    getDINall(addr) - returns all of the digital inputs as an 8-bit number. Bit
+                      1 is the least significant bit (LSB) and bit 8 is the most
+                      significant bit:
+                     —————————————————
+                     |8|7|6|5|4|3|2|1|
+                     —————————————————
+    getFREQ(addr,bit) - returns the measured frequency of the specified input. 
+                        This function only works on inputs 1-6.
+    
+    getFREQall(addr) -  returns the measured frequency of inputs 1-6 as a six
+                        element list.
+                        
+Event Functions
+    eventEnable(addr) - DIGIplate will pull down on INT pin (GPIO22) if an
+                        enabled event occurs
+    
+    eventDisable(addr) - DIGIplate will not assert interrupts on GPIO22
+    
+    enableDINevent(addr, bit, edge) - enable interrupt for specified bit. The
+                        "edge" field requires a single character argument:
+                        'F' for falling edge
+                        'R' for rising edge 
+                        'B' for both rising and falling edges
+                        Note that lower case characters are also allowed.
+                        
+    disableDINevent(addr, bit) - disable interrupts on the specified bit              
+    
+    getEVENT(addr) - returns the 16 bit EVENT flag register in DIGIplate. If 
+                     enabled, the upper 8 bits indicate that a falling edge
+                     has been detected on a specific bit while the lower 8
+                     bits will indicate that a rising edge has occurred.
+
+Bit 15  14   13   12   11   10    9    8    7    6    5   4    3    2   1    0
+ ———————————————————————————————————————————————————————————————————————————————
+ | 8F | 7F | 6F | 5F | 4F | 3F | 2F | 1F | 8R | 7R | 6R |5R | 4R | 3R |2R | 1R |
+ ———————————————————————————————————————————————————————————————————————————————
+                        Executing this function causes the DIGIplate to deassert
+                        the interrupt line (if enabled) and to clear the 16-bit
+                        INT flag register.
+    check4EVENTS(addr) - reads the status of the event pin and returns True if
+                         an event has occurred or a False if there is
+                         no change.
+LED Control Functions
+    setLED(addr) - turn on the LED
+    clrLED(addr) - turn off the LED
+    toggleLED(addr) - if LED is on, turn off. If LED is off, turn on.
+
+System Level Functions:
+    getID(addr) - return Pi-Plate descriptor string
+    getFWrev(addr) - return FW revision in byte format
+    getHWrev(addr) - return HW revision in byte format
+    getVersion() - returns revision of python module
+    getADDR(addr) - return address of pi-plate. Used for polling available
+                    boards at power up.
+    RESET(addr) - set DIGIplate to power on state.
